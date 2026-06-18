@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+
+# Streamlit
+fintrack-dashboard/cache_fintrack.db
+fintrack-dashboard/user_preferences.json
+
+# Node
+fintrack-api/node_modules/
+fintrack-api/dist/
+fintrack-api/fintrack.db
+fintrack-api/db.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
