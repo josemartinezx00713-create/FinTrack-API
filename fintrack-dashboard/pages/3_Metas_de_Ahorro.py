@@ -1,13 +1,14 @@
 import streamlit as st
 import pandas as pd
-import requests
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client
+from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client, get_local_repo
+from models.exceptions import ApiCaidaError, DatosNoEncontradosError
 
 st.set_page_config(page_title="Metas de Ahorro", layout="wide")
 apply_global_css()
 
 api = get_api_client()
+local_repo = get_local_repo()
 
 st.title("Metas de Ahorro")
 
@@ -22,13 +23,20 @@ with st.sidebar.expander("Añadir Nueva Meta"):
                 st.success("Meta añadida.")
                 st.cache_data.clear()
                 st.rerun()
-            except Exception as e:
-                st.error("Error al crear la meta")
+            except ApiCaidaError as e:
+                st.error(f"Error de conexión: {e.message}")
 
 try:
     goals = api.get_goals()
-except Exception:
-    goals = []
+    if goals:
+        local_repo.cache_goals(goals)
+except ApiCaidaError:
+    try:
+        goals = local_repo.get_goals()
+        st.warning("Usando datos locales (API no disponible)")
+    except DatosNoEncontradosError:
+        goals = []
+        st.info("No hay metas en caché local.")
 
 if goals:
     cols = st.columns(3)
@@ -104,8 +112,8 @@ if goals:
                             st.success("Depósito exitoso")
                             st.cache_data.clear()
                             st.rerun()
-                        except:
-                            st.error("Error al depositar")
+                        except ApiCaidaError as e:
+                            st.error(f"Error de conexión: {e.message}")
                 with cB:
                     if st.form_submit_button("Eliminar Meta"):
                         try:
@@ -113,8 +121,8 @@ if goals:
                             st.success("Meta eliminada exitosamente")
                             st.cache_data.clear()
                             st.rerun()
-                        except:
-                            st.error("Error eliminando meta")
+                        except ApiCaidaError as e:
+                            st.error(f"Error de conexión: {e.message}")
     elif len(selected_goals) > 1:
         st.markdown("---")
         st.subheader(f"{len(selected_goals)} Metas Seleccionadas")
@@ -128,7 +136,7 @@ if goals:
                         st.success("Metas eliminadas.")
                         st.cache_data.clear()
                         st.rerun()
-                    except:
-                        st.error("Error al eliminar metas.")
+                    except ApiCaidaError as e:
+                        st.error(f"Error de conexión: {e.message}")
 else:
     st.info("No tienes metas de ahorro actualmente. ¡Comienza planeando un viaje o ahorrando para algo que te guste!")

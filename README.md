@@ -6,6 +6,71 @@ Proyecto trabajado en clases de Administración de sistemas de información.
 
 ---
 
+##  Diagrama de Arquitectura Hexagonal
+
+```mermaid
+flowchart TD
+    subgraph UI["Capa de Presentación (Streamlit)"]
+        D["Dashboard.py"]
+        T["Transacciones.py"]
+        P["Presupuestos.py"]
+        G["Metas.py"]
+        R["Reportes.py"]
+    end
+
+    subgraph Ports["Puertos / Interfaces"]
+        IAC["IApiClient (ABC)"]
+        ICR["ICacheRepository (ABC)"]
+    end
+
+    subgraph Adapters_In["Adaptadores de Entrada"]
+        direction LR
+        UI -->|"llama a"| UC["Casos de Uso<br/>(ui_tweak.py)"]
+    end
+
+    subgraph Adapters_Out["Adaptadores de Salida"]
+        API["ApiClient<br/>(requests)"]
+        CACHE["CacheService<br/>(SQLite local)"]
+        LOCAL["LocalRepository<br/>(fallback)"]
+    end
+
+    subgraph Domain["Capa de Dominio"]
+        MODELS["models.py<br/>(dataclasses puras)"]
+        EXC["exceptions.py<br/>(ApiCaidaError,<br/>DatosNoEncontradosError)"]
+    end
+
+    subgraph External["Servicios Externos"]
+        REST["API REST (Hono.js)<br/>fintrack-api:3000"]
+        SQLITE["SQLite (fintrack.db)"]
+    end
+
+    UC --> IAC
+    UC --> ICR
+    IAC --> API
+    ICR --> CACHE
+    API --> REST
+    REST --> SQLITE
+    CACHE --> LOCAL
+    LOCAL -->|"fallback"| CACHE
+
+    style UI fill:#1a1a2e,stroke:#e94560,color:#fff
+    style Ports fill:#16213e,stroke:#0f3460,color:#fff
+    style Adapters_In fill:#0f3460,stroke:#533483,color:#fff
+    style Adapters_Out fill:#533483,stroke:#e94560,color:#fff
+    style Domain fill:#16213e,stroke:#e94560,color:#fff
+    style External fill:#1a1a2e,stroke:#0f3460,color:#fff
+```
+
+### Flujo Normal
+```
+Streamlit → ApiClient → API REST (Hono.js) → SQLite (servidor)
+```
+### Flujo Fallback
+```
+Streamlit → LocalRepository → CacheService → SQLite local
+```
+Cuando la API falla (ApiCaidaError), el sistema usa automáticamente los datos cacheados en SQLite local, sin que el usuario pierda funcionalidad.
+
 ##  Arquitectura del Sistema
 
 El proyecto opera bajo un ecosistema bifurcado en dos ejes principales que se comunican de forma ininterrumpida por comandos HTTP.

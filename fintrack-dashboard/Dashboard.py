@@ -1,13 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, get_rate, get_api_client
+from ui_tweak import apply_global_css, fmt_money, get_rate, get_api_client, get_local_repo
 from ui.components import render_kpi_card, render_donut_chart, render_trend_chart, render_top_expenses
+from models.exceptions import ApiCaidaError, DatosNoEncontradosError
 
 st.set_page_config(page_title="FinTrack", layout="wide", initial_sidebar_state="expanded")
 apply_global_css()
 
 api = get_api_client()
+local_repo = get_local_repo()
 
 st.title("Panel Principal")
 
@@ -38,16 +40,30 @@ def calc_delta(curr, prev, invert_colors=False):
     else:
         return f'<div class="delta-badge delta-neutral">0% vs {prev_month_input}</div>'
 
-try:
-    summary = api.get_summary(month_input)
-except Exception:
-    summary = None
+def fetch_summary(month):
+    try:
+        data = api.get_summary(month)
+        try:
+            txns = api.get_transactions(month)
+            if txns:
+                local_repo.cache_transactions(txns, month)
+        except Exception:
+            pass
+        return data
+    except ApiCaidaError:
+        try:
+            data = local_repo.get_summary(month)
+            st.warning("Usando datos locales (API no disponible)")
+            return data
+        except DatosNoEncontradosError:
+            return None
+    except DatosNoEncontradosError:
+        return None
+
+summary = fetch_summary(month_input)
 
 prev_month_input = get_prev_month(month_input)
-try:
-    prev_summary = api.get_summary(prev_month_input) if prev_month_input else None
-except Exception:
-    prev_summary = None
+prev_summary = fetch_summary(prev_month_input) if prev_month_input else None
 
 if summary:
     c1, c2, c3, c4 = st.columns(4)
@@ -70,8 +86,11 @@ if summary:
         st.markdown('<div class="section-card"><h3>Distribución de Gastos</h3>', unsafe_allow_html=True)
         try:
             cat_stats = api.get_category_stats(month_input)
-        except Exception:
-            cat_stats = {}
+        except ApiCaidaError:
+            try:
+                cat_stats = local_repo.get_category_stats(month_input)
+            except DatosNoEncontradosError:
+                cat_stats = {}
         render_donut_chart(cat_stats, fmt_money)
         st.markdown("</div>", unsafe_allow_html=True)
 
@@ -79,16 +98,22 @@ if summary:
         st.markdown('<div class="section-card"><h3>Tendencia (Últimos 6 Meses)</h3>', unsafe_allow_html=True)
         try:
             trends = api.get_trends()
-        except Exception:
-            trends = []
+        except ApiCaidaError:
+            try:
+                trends = local_repo.get_trends()
+            except DatosNoEncontradosError:
+                trends = []
         render_trend_chart(trends, get_rate())
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="section-card" style="margin-bottom: 0px;"><h3>Categorías de Gastos Top</h3>', unsafe_allow_html=True)
     try:
         top_exp = api.get_top_expenses(month_input)
-    except Exception:
-        top_exp = []
+    except ApiCaidaError:
+        try:
+            top_exp = local_repo.get_top_expenses(month_input)
+        except DatosNoEncontradosError:
+            top_exp = []
     render_top_expenses(top_exp, summary.get("expense", 1), fmt_money)
     st.markdown("</div>", unsafe_allow_html=True)
 else:

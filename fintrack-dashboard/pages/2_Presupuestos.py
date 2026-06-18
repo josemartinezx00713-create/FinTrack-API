@@ -2,12 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client
+from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client, get_local_repo
+from models.exceptions import ApiCaidaError, DatosNoEncontradosError
 
 st.set_page_config(page_title="Presupuestos", layout="wide")
 apply_global_css()
 
 api = get_api_client()
+local_repo = get_local_repo()
 CATEGORIAS = ["Comida", "Transporte", "Vivienda", "Salud", "Entretenimiento", "Compras", "Educación", "Servicios", "Ahorros", "Otros"]
 
 st.title("Presupuestos")
@@ -26,14 +28,20 @@ with st.sidebar.expander("Establecer Presupuesto", expanded=False):
                 st.success("¡Presupuesto guardado!")
                 st.cache_data.clear()
                 st.rerun()
-            except Exception as e:
-                st.error("Error al establecer presupuesto")
+            except ApiCaidaError as e:
+                st.error(f"Error de conexión: {e.message}")
 
 try:
     budgets = api.get_budget_status(month_input)
-except Exception:
-    budgets = []
-    st.error("Error conectando con la API")
+    if budgets:
+        local_repo.cache_budgets(budgets, month_input)
+except ApiCaidaError:
+    try:
+        budgets = local_repo.get_budgets(month_input)
+        st.warning("Usando datos locales (API no disponible)")
+    except DatosNoEncontradosError:
+        budgets = []
+        st.info("No hay datos de presupuestos en caché local.")
 
 if budgets:
     total_limes = sum(b["limitAmount"] for b in budgets)
@@ -118,8 +126,8 @@ if budgets:
                             st.success("Límite actualizado.")
                             st.cache_data.clear()
                             st.rerun()
-                        except:
-                            st.error("Error interconectando a BD")
+                        except ApiCaidaError as e:
+                            st.error(f"Error de conexión: {e.message}")
                 with cB:
                     if st.form_submit_button("Eliminar Presupuesto"):
                         try:
@@ -127,23 +135,23 @@ if budgets:
                             st.success("Eliminado con éxito.")
                             st.cache_data.clear()
                             st.rerun()
-                        except:
-                            st.error("Error al eliminar")
+                        except ApiCaidaError as e:
+                            st.error(f"Error de conexión: {e.message}")
     elif len(selected) > 1:
         st.markdown("---")
         st.subheader(f"{len(selected)} Presupuestos Seleccionados")
         with st.container(border=True):
             st.info("Has seleccionado múltiples presupuestos. La edición simultánea no está permitida.")
             with st.form("bulk_delete_bg"):
-                if st.form_submit_button("Eliminar Seleccionados"):
-                    try:
-                        ids = [r["ID_Oculto"] for _, r in selected.iterrows()]
-                        api.bulk_delete_budgets(ids)
-                        st.success("Presupuestos eliminados.")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except:
-                        st.error("Error al eliminar presupuestos.")
+                    if st.form_submit_button("Eliminar Seleccionados"):
+                        try:
+                            ids = [r["ID_Oculto"] for _, r in selected.iterrows()]
+                            api.bulk_delete_budgets(ids)
+                            st.success("Presupuestos eliminados.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except ApiCaidaError as e:
+                            st.error(f"Error de conexión: {e.message}")
 else:
     st.info("No hay presupuestos configurados para este mes.")
 

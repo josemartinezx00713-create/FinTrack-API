@@ -3,18 +3,28 @@ import pandas as pd
 import io
 import xlsxwriter
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, get_currency, get_rate, get_api_client
+from ui_tweak import apply_global_css, fmt_money, get_currency, get_rate, get_api_client, get_local_repo
+from models.exceptions import ApiCaidaError, DatosNoEncontradosError
 
 st.set_page_config(page_title="Reportes", layout="wide")
 apply_global_css()
 
 api = get_api_client()
+local_repo = get_local_repo()
 
 st.title("Reportes Detallados")
 
 st.subheader("Comparativa Mensual (Últimos 6 meses)")
+def fetch_trends():
+    try:
+        return api.get_trends(6)
+    except ApiCaidaError:
+        try:
+            return local_repo.get_trends(6)
+        except DatosNoEncontradosError:
+            return []
 try:
-    trends = api.get_trends(6)
+    trends = fetch_trends()
     if trends:
         df_trends = pd.DataFrame(trends)
         rate = get_rate()
@@ -45,10 +55,15 @@ with col1:
 with col2:
     st.markdown("<br>", unsafe_allow_html=True)
     try:
-        data = api.get_transactions(month_input)
-        if data:
+        try:
+            data = api.get_transactions(month_input)
             cats = api.get_category_stats(month_input)
             summary = api.get_summary(month_input)
+        except ApiCaidaError:
+            data = local_repo.get_transactions(month_input)
+            cats = local_repo.get_category_stats(month_input)
+            summary = local_repo.get_summary(month_input)
+        if data:
 
             df_exp = pd.DataFrame(data)
             df_exp_esp = df_exp.copy()
@@ -159,5 +174,5 @@ with col2:
             )
         else:
             st.write("No se encontraron transacciones para este mes.")
-    except Exception as e:
-        st.write(f"Error cargando los datos para la exportación: {e}")
+    except (ApiCaidaError, DatosNoEncontradosError) as e:
+        st.error(f"No hay datos disponibles: {e}")
