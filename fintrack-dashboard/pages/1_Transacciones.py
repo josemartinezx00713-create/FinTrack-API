@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from di_container import apply_global_css, get_container
-from models.config import CATEGORIAS
+from models.config import CATEGORIAS, CATEGORIAS_INGRESO, CATEGORIAS_GASTO
 
 st.set_page_config(page_title="Transacciones", layout="wide")
 apply_global_css()
@@ -26,11 +26,13 @@ with col4:
     search_input = st.text_input("Buscar Descripción", "")
 
 with st.sidebar.expander(" Añadir Transacción", expanded=False):
+    t_type_display = st.radio("Tipo de Transacción", ["Gastos", "Ingresos"], horizontal=True)
+    t_type = "expense" if t_type_display == "Gastos" else "income"
+    opciones_cat = CATEGORIAS_GASTO if t_type == "expense" else CATEGORIAS_INGRESO
+    
     with st.form("add_transaction_form"):
         t_amount = st.number_input("Monto", min_value=0.01, step=0.01)
-        t_type_display = st.radio("Tipo", ["Gastos", "Ingresos"], horizontal=True)
-        t_type = "expense" if t_type_display == "Gastos" else "income"
-        t_cat = st.selectbox("Categoría", CATEGORIAS)
+        t_cat = st.selectbox("Categoría", opciones_cat)
         t_desc = st.text_input("Descripción")
         t_date = st.date_input("Fecha")
         submitted = st.form_submit_button("Añadir")
