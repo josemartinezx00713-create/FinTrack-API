@@ -31,7 +31,7 @@ with st.sidebar.expander(" Añadir Transacción", expanded=False):
     opciones_cat = CATEGORIAS_GASTO if t_type == "expense" else CATEGORIAS_INGRESO
     
     with st.form("add_transaction_form"):
-        t_amount = st.number_input("Monto", min_value=0.01, step=0.01)
+        t_amount = st.number_input(f"Monto ({currency.get_currency_symbol()})", min_value=0.01, step=0.01)
         t_cat = st.selectbox("Categoría", opciones_cat)
         t_desc = st.text_input("Descripción")
         t_date = st.date_input("Fecha")
@@ -39,7 +39,7 @@ with st.sidebar.expander(" Añadir Transacción", expanded=False):
 
         if submitted:
             payload = {
-                "amount": t_amount, "type": t_type, "category": t_cat,
+                "amount": currency.to_base(t_amount), "type": t_type, "category": t_cat,
                 "description": t_desc, "date": t_date.strftime("%Y-%m-%d"), "currency": "C$"
             }
             try:
@@ -100,7 +100,7 @@ if data:
                     cA, cB, cC = st.columns(3)
                     with cA:
                         u_desc = st.text_input("Descripción", value=row["Descripción"])
-                        u_monto = st.number_input("Monto", value=float(row["Monto_Original"]), step=0.01)
+                        u_monto = st.number_input(f"Monto ({currency.get_currency_symbol()})", value=float(currency.from_base(row["Monto_Original"])), step=0.01)
                     with cB:
                         cat_index = CATEGORIAS.index(row["Categoría"]) if row["Categoría"] in CATEGORIAS else 0
                         u_cat = st.selectbox("Categoría", CATEGORIAS, index=cat_index)
@@ -116,7 +116,7 @@ if data:
                     with colBtn1:
                         if st.form_submit_button(" Guardar", type="primary"):
                             payload = {
-                                "description": u_desc, "amount": u_monto,
+                                "description": u_desc, "amount": currency.to_base(u_monto),
                                 "category": u_cat, "type": "income" if u_tipo == "Ingreso" else "expense",
                                 "date": u_fecha.strftime("%Y-%m-%d")
                             }

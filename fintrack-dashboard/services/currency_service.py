@@ -58,6 +58,14 @@ class CurrencyService:
         except Exception:
             return 1.0
 
+    def to_base(self, amount: float) -> float:
+        rate = self.get_rate()
+        return amount / rate if rate > 0 else amount
+
+    def from_base(self, amount: float) -> float:
+        rate = self.get_rate()
+        return amount * rate
+
     def fmt_money(self, amount: float) -> str:
         rate = self.get_rate()
         sym = self.get_currency_symbol()

@@ -20,11 +20,11 @@ month_input = st.date_input("Seleccionar Mes (Usa el calendario)", current_month
 with st.sidebar.expander("Establecer Presupuesto", expanded=False):
     with st.form("add_budget"):
         b_cat = st.selectbox("Categoría", CATEGORIAS_GASTO)
-        b_limit = st.number_input("Límite Crudo Numérico", min_value=1.0, step=10.0)
+        b_limit = st.number_input(f"Límite ({currency.get_currency_symbol()})", min_value=0.01, step=10.0)
         submitted = st.form_submit_button("Crear")
         if submitted:
             try:
-                fetcher.create_budget({"category": b_cat, "limitAmount": b_limit, "month": month_input})
+                fetcher.create_budget({"category": b_cat, "limitAmount": currency.to_base(b_limit), "month": month_input})
                 st.success("¡Presupuesto guardado!")
                 st.cache_data.clear()
                 st.rerun()
@@ -109,13 +109,13 @@ if budgets:
 
         with st.container(border=True):
             with st.form("update_budget"):
-                u_limit = st.number_input("Nuevo Límite Numérico", value=float(row["Monto_Crudo"]), step=10.0)
+                u_limit = st.number_input(f"Nuevo Límite ({currency.get_currency_symbol()})", value=float(currency.from_base(row["Monto_Crudo"])), step=10.0)
                 st.markdown("<br>", unsafe_allow_html=True)
                 cA, cB = st.columns([1, 10])
                 with cA:
                     if st.form_submit_button("Guardar", type="primary"):
                         try:
-                            fetcher.update_budget(row["ID_Oculto"], {"limitAmount": u_limit})
+                            fetcher.update_budget(row["ID_Oculto"], {"limitAmount": currency.to_base(u_limit)})
                             st.success("Límite actualizado.")
                             st.cache_data.clear()
                             st.rerun()

@@ -15,14 +15,14 @@ st.title("Metas de Ahorro")
 with st.sidebar.expander("Añadir Nueva Meta"):
     with st.form("new_goal"):
         g_name = st.text_input("Nombre de la Meta")
-        g_target = st.number_input("Monto Objetivo Numérico", min_value=0.01, value=None, step=10.0)
+        g_target = st.number_input(f"Monto Objetivo ({currency.get_currency_symbol()})", min_value=0.01, value=None, step=10.0)
         g_deadline = st.date_input("Fecha Límite")
         if st.form_submit_button("Crear Meta"):
             if g_target is None:
                 st.error("Por favor, introduce un monto válido.")
             else:
                 try:
-                    fetcher.create_goal({"name": g_name, "target": g_target, "deadline": g_deadline.strftime("%Y-%m-%d")})
+                    fetcher.create_goal({"name": g_name, "target": currency.to_base(g_target), "deadline": g_deadline.strftime("%Y-%m-%d")})
                     st.success("Meta añadida.")
                     st.cache_data.clear()
                     st.rerun()
@@ -97,14 +97,14 @@ if goals:
         with st.container(border=True):
             with st.form("goal_interaction"):
                 st.markdown("Añadir Fondos al ahorro guardado:")
-                deposit = st.number_input("Cantidad a Depositar", min_value=0.1, step=10.0)
+                deposit = st.number_input(f"Cantidad a Depositar ({currency.get_currency_symbol()})", min_value=0.01, step=10.0)
 
                 st.markdown("<br>", unsafe_allow_html=True)
                 cA, cB = st.columns([1, 10])
                 with cA:
                     if st.form_submit_button("Depositar", type="primary"):
                         try:
-                            fetcher.deposit_to_goal(row["ID_Oculto"], deposit)
+                            fetcher.deposit_to_goal(row["ID_Oculto"], currency.to_base(deposit))
                             st.success("Depósito exitoso")
                             st.cache_data.clear()
                             st.rerun()
