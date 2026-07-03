@@ -15,16 +15,19 @@ st.title("Metas de Ahorro")
 with st.sidebar.expander("Añadir Nueva Meta"):
     with st.form("new_goal"):
         g_name = st.text_input("Nombre de la Meta")
-        g_target = st.number_input("Monto Objetivo Numérico", min_value=1.0)
+        g_target = st.number_input("Monto Objetivo Numérico", min_value=0.01, value=None, step=10.0)
         g_deadline = st.date_input("Fecha Límite")
         if st.form_submit_button("Crear Meta"):
-            try:
-                fetcher.create_goal({"name": g_name, "target": g_target, "deadline": g_deadline.strftime("%Y-%m-%d")})
-                st.success("Meta añadida.")
-                st.cache_data.clear()
-                st.rerun()
-            except Exception as e:
-                st.error("Error al crear meta.")
+            if g_target is None:
+                st.error("Por favor, introduce un monto válido.")
+            else:
+                try:
+                    fetcher.create_goal({"name": g_name, "target": g_target, "deadline": g_deadline.strftime("%Y-%m-%d")})
+                    st.success("Meta añadida.")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error("Error al crear meta.")
 
 goals = fetcher.get_goals()
 
