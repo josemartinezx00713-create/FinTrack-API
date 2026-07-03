@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
 from di_container import apply_global_css, get_container
-from models.config import CATEGORIAS
+from models.config import CATEGORIAS_GASTO
 
 st.set_page_config(page_title="Presupuestos", layout="wide")
 apply_global_css()
@@ -19,7 +19,7 @@ month_input = st.date_input("Seleccionar Mes (Usa el calendario)", current_month
 
 with st.sidebar.expander("Establecer Presupuesto", expanded=False):
     with st.form("add_budget"):
-        b_cat = st.selectbox("Categoría", CATEGORIAS)
+        b_cat = st.selectbox("Categoría", CATEGORIAS_GASTO)
         b_limit = st.number_input("Límite Crudo Numérico", min_value=1.0, step=10.0)
         submitted = st.form_submit_button("Crear")
         if submitted:
