@@ -1,33 +1,22 @@
 CATEGORIAS_INGRESO = [
     "Salario",
     "Freelance",
+    "Rendimientos",
+    "Ventas",
     "Otros"
 ]
 
 CATEGORIAS_GASTO = [
-    "Comida",
+    "Alimentación",
     "Transporte",
     "Vivienda",
     "Salud",
-    "Entretenimiento",
-    "Compras",
+    "Ocio",
+    "Ropa",
     "Educación",
     "Servicios",
     "Ahorros",
     "Otros"
 ]
 
-CATEGORIAS = [
-    "Comida",
-    "Transporte",
-    "Vivienda",
-    "Salud",
-    "Entretenimiento",
-    "Compras",
-    "Educación",
-    "Servicios",
-    "Ahorros",
-    "Salario",
-    "Freelance",
-    "Otros"
-]
+CATEGORIAS = CATEGORIAS_GASTO + CATEGORIAS_INGRESO
