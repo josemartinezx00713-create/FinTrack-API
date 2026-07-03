@@ -2,15 +2,15 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client, get_local_repo
-from models.exceptions import ApiCaidaError, DatosNoEncontradosError
+from di_container import apply_global_css, get_container
+from models.config import CATEGORIAS
 
 st.set_page_config(page_title="Presupuestos", layout="wide")
 apply_global_css()
 
-api = get_api_client()
-local_repo = get_local_repo()
-CATEGORIAS = ["Comida", "Transporte", "Vivienda", "Salud", "Entretenimiento", "Compras", "Educación", "Servicios", "Ahorros", "Otros"]
+container = get_container()
+fetcher = container.data_fetcher
+currency = container.currency_service
 
 st.title("Presupuestos")
 
@@ -24,24 +24,17 @@ with st.sidebar.expander("Establecer Presupuesto", expanded=False):
         submitted = st.form_submit_button("Crear")
         if submitted:
             try:
-                api.create_budget({"category": b_cat, "limitAmount": b_limit, "month": month_input})
+                fetcher.create_budget({"category": b_cat, "limitAmount": b_limit, "month": month_input})
                 st.success("¡Presupuesto guardado!")
                 st.cache_data.clear()
                 st.rerun()
-            except ApiCaidaError as e:
-                st.error(f"Error de conexión: {e.message}")
+            except Exception as e:
+                st.error("Error de conexión al guardar presupuesto.")
 
-try:
-    budgets = api.get_budget_status(month_input)
-    if budgets:
-        local_repo.cache_budgets(budgets, month_input)
-except ApiCaidaError:
-    try:
-        budgets = local_repo.get_budgets(month_input)
-        st.warning("Usando datos locales (API no disponible)")
-    except DatosNoEncontradosError:
-        budgets = []
-        st.info("No hay datos de presupuestos en caché local.")
+budgets = fetcher.get_budget_status(month_input)
+
+if not budgets:
+    st.info("No hay datos de presupuestos en caché local o el API no los devolvió.")
 
 if budgets:
     total_limes = sum(b["limitAmount"] for b in budgets)
@@ -61,7 +54,7 @@ if budgets:
         fig.update_layout(height=200, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font={"color":"#a0aec0"})
         st.plotly_chart(fig, width="stretch")
     with col_stats:
-        st.markdown(f"<br><br><h2 style='color: {ring_color}'>Has gastado {fmt_html_money(total_spent)}</h2><h4>de {fmt_html_money(total_limes)} presupuestados</h4>", unsafe_allow_html=True)
+        st.markdown(f"<br><br><h2 style='color: {ring_color}'>Has gastado {currency.fmt_html_money(total_spent)}</h2><h4>de {currency.fmt_html_money(total_limes)} presupuestados</h4>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### Vista de Consumo")
@@ -76,14 +69,14 @@ if budgets:
     <div style="display: flex; justify-content: space-between; align-items: flex-end;">
         <div>
             <div class="budget-title">{b["category"]}</div>
-            <div class="budget-limits">Límite Mensual: <b>{fmt_html_money(b["limitAmount"])}</b></div>
+            <div class="budget-limits">Límite Mensual: <b>{currency.fmt_html_money(b["limitAmount"])}</b></div>
         </div>
     </div>
     <div class="bar-container">
         <div class="bar-fill" style="width: {clamped_pct}%; background-color: {bar_color};"></div>
     </div>
     <div class="budget-stats" style="color: {bar_color};">
-        Gastado: {fmt_html_money(spent)} ({pct:.1f}%)
+        Gastado: {currency.fmt_html_money(spent)} ({pct:.1f}%)
     </div>
 </div>""", unsafe_allow_html=True)
 
@@ -93,8 +86,8 @@ if budgets:
 
     df = pd.DataFrame(budgets)
     df_view = df.copy()
-    df_view["Límite"] = df_view["limitAmount"].apply(fmt_money)
-    df_view["Gastado"] = df_view["spent"].apply(fmt_money)
+    df_view["Límite"] = df_view["limitAmount"].apply(currency.fmt_money)
+    df_view["Gastado"] = df_view["spent"].apply(currency.fmt_money)
     df_view.insert(0, "Seleccionar", False)
     df_view = df_view[["Seleccionar", "id", "category", "Límite", "Gastado", "limitAmount"]]
     df_view.rename(columns={"id": "ID_Oculto", "category": "Categoría", "limitAmount": "Monto_Crudo"}, inplace=True)
@@ -122,21 +115,21 @@ if budgets:
                 with cA:
                     if st.form_submit_button("Guardar", type="primary"):
                         try:
-                            api.update_budget(row["ID_Oculto"], {"limitAmount": u_limit})
+                            fetcher.update_budget(row["ID_Oculto"], {"limitAmount": u_limit})
                             st.success("Límite actualizado.")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error al actualizar límite.")
                 with cB:
                     if st.form_submit_button("Eliminar Presupuesto"):
                         try:
-                            api.delete_budget(row["ID_Oculto"])
+                            fetcher.delete_budget(row["ID_Oculto"])
                             st.success("Eliminado con éxito.")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error al eliminar.")
     elif len(selected) > 1:
         st.markdown("---")
         st.subheader(f"{len(selected)} Presupuestos Seleccionados")
@@ -146,17 +139,17 @@ if budgets:
                     if st.form_submit_button("Eliminar Seleccionados"):
                         try:
                             ids = [r["ID_Oculto"] for _, r in selected.iterrows()]
-                            api.bulk_delete_budgets(ids)
+                            fetcher.bulk_delete_budgets(ids)
                             st.success("Presupuestos eliminados.")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error al eliminar presupuestos.")
 else:
     st.info("No hay presupuestos configurados para este mes.")
 
 try:
-    cat_r = api.get_category_stats(month_input)
+    cat_r = fetcher.get_category_stats(month_input)
     if isinstance(cat_r, dict):
         cats_spent = set(cat_r.keys())
         budgeted_cats = set(b["category"] for b in budgets) if budgets else set()

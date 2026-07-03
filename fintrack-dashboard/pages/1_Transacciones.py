@@ -1,15 +1,15 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, get_api_client, get_local_repo
-from models.exceptions import ApiCaidaError, DatosNoEncontradosError
+from di_container import apply_global_css, get_container
+from models.config import CATEGORIAS
 
 st.set_page_config(page_title="Transacciones", layout="wide")
 apply_global_css()
 
-api = get_api_client()
-local_repo = get_local_repo()
-CATEGORIAS = ["Comida", "Transporte", "Vivienda", "Salud", "Entretenimiento", "Compras", "Educación", "Servicios", "Ahorros", "Salario", "Freelance", "Otros"]
+container = get_container()
+fetcher = container.data_fetcher
+currency = container.currency_service
 
 st.title("Transacciones")
 
@@ -41,23 +41,17 @@ with st.sidebar.expander(" Añadir Transacción", expanded=False):
                 "description": t_desc, "date": t_date.strftime("%Y-%m-%d"), "currency": "C$"
             }
             try:
-                api.create_transaction(payload)
+                fetcher.create_transaction(payload)
                 st.success("¡Transacción añadida exitosamente!")
                 st.cache_data.clear()
                 st.rerun()
-            except ApiCaidaError as e:
-                st.error(f"Error de conexión: {e.message}")
+            except Exception as e:
+                st.error("Error de conexión al añadir transacción.")
 
-try:
-    data = api.get_transactions(month_input, cat_input if cat_input != "Todas" else "", type_input)
-    local_repo.cache_transactions(data, month_input)
-except ApiCaidaError:
-    try:
-        data = local_repo.get_transactions(month_input, cat_input if cat_input != "Todas" else "", type_input)
-        st.warning("Usando datos locales (API no disponible)")
-    except DatosNoEncontradosError:
-        data = []
-        st.info("No hay datos disponibles en caché local.")
+data = fetcher.get_transactions(month_input, cat_input if cat_input != "Todas" else "", type_input)
+
+if not data:
+    st.info("No hay datos disponibles en caché local.")
 
 if data:
     df = pd.DataFrame(data)
@@ -70,7 +64,7 @@ if data:
         df_view = df.copy()
         df_view["type"] = df_view["type"].apply(lambda x: "Ingreso" if x == "income" else "Gasto")
         df_view["amount"] = pd.to_numeric(df_view["amount"])
-        df_view["Monto Format"] = df_view["amount"].apply(fmt_money)
+        df_view["Monto Format"] = df_view["amount"].apply(currency.fmt_money)
         df_view.insert(0, "Seleccionar", False)
         df_view = df_view[["Seleccionar", "id", "date", "type", "category", "description", "amount", "Monto Format", "currency"]]
         df_view.rename(columns={
@@ -125,22 +119,22 @@ if data:
                                 "date": u_fecha.strftime("%Y-%m-%d")
                             }
                             try:
-                                api.update_transaction(selected_id, payload)
+                                fetcher.update_transaction(selected_id, payload)
                                 st.success("¡Transacción actualizada!")
                                 st.cache_data.clear()
                                 st.rerun()
-                            except ApiCaidaError as e:
-                                st.error(f"Error de conexión: {e.message}")
+                            except Exception as e:
+                                st.error("Error de conexión al actualizar.")
 
                     with colBtn2:
                         if st.form_submit_button(" Eliminar"):
                             try:
-                                api.delete_transaction(selected_id)
+                                fetcher.delete_transaction(selected_id)
                                 st.success("Transacción eliminada exitosamente.")
                                 st.cache_data.clear()
                                 st.rerun()
-                            except ApiCaidaError as e:
-                                st.error(f"Error de conexión: {e.message}")
+                            except Exception as e:
+                                st.error("Error de conexión al eliminar.")
 
         elif len(selected) > 1:
             st.markdown("---")
@@ -151,11 +145,11 @@ if data:
                     if st.form_submit_button("Eliminar Seleccionadas"):
                         try:
                             ids = [r["ID_Oculto"] for _, r in selected.iterrows()]
-                            api.bulk_delete_transactions(ids)
+                            fetcher.bulk_delete_transactions(ids)
                             st.success("Transacciones eliminadas.")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error de conexión al eliminar.")
 else:
     st.info("No se encontraron transacciones. ¡Añade algunas desde el panel lateral!")

@@ -1,16 +1,19 @@
 from services.ports import (
-    ICacheRepository, ITransactionRepository, IBudgetRepository,
+    ITransactionCache, IBudgetCache, IGoalCache,
+    ITransactionRepository, IBudgetRepository,
     IGoalRepository, IStatsRepository
 )
 from models.exceptions import DatosNoEncontradosError
 
 
 class LocalRepository(ITransactionRepository, IBudgetRepository, IGoalRepository, IStatsRepository):
-    def __init__(self, cache: ICacheRepository):
-        self.cache = cache
+    def __init__(self, cache_tx: ITransactionCache, cache_budget: IBudgetCache, cache_goal: IGoalCache):
+        self.cache_tx = cache_tx
+        self.cache_budget = cache_budget
+        self.cache_goal = cache_goal
 
     def get_transactions(self, month: str = "", category: str = "", type_: str = "") -> list:
-        data = self.cache.get_cached_transactions(month)
+        data = self.cache_tx.get_cached_transactions(month)
         if not data:
             raise DatosNoEncontradosError("No hay transacciones en caché local.")
         if category:
@@ -31,11 +34,10 @@ class LocalRepository(ITransactionRepository, IBudgetRepository, IGoalRepository
     def bulk_delete_transactions(self, ids: list[str]) -> dict:
         raise NotImplementedError("LocalRepository es solo lectura.")
 
-    def cache_transactions(self, transactions: list, month: str):
-        self.cache.cache_transactions(transactions, month)
+
 
     def get_budgets(self, month: str = "") -> list:
-        data = self.cache.get_cached_budgets(month)
+        data = self.cache_budget.get_cached_budgets(month)
         if not data:
             raise DatosNoEncontradosError("No hay presupuestos en caché local.")
         return data
@@ -55,11 +57,10 @@ class LocalRepository(ITransactionRepository, IBudgetRepository, IGoalRepository
     def bulk_delete_budgets(self, ids: list[str]) -> dict:
         raise NotImplementedError("LocalRepository es solo lectura.")
 
-    def cache_budgets(self, budgets: list, month: str):
-        self.cache.cache_budgets(budgets, month)
+
 
     def get_goals(self) -> list:
-        data = self.cache.get_cached_goals()
+        data = self.cache_goal.get_cached_goals()
         if not data:
             raise DatosNoEncontradosError("No hay metas en caché local.")
         return data
@@ -76,8 +77,7 @@ class LocalRepository(ITransactionRepository, IBudgetRepository, IGoalRepository
     def bulk_delete_goals(self, ids: list[str]) -> dict:
         raise NotImplementedError("LocalRepository es solo lectura.")
 
-    def cache_goals(self, goals: list):
-        self.cache.cache_goals(goals)
+
 
     def get_summary(self, month: str) -> dict:
         transactions = self.get_transactions(month)

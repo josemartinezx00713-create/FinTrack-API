@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 
-class IApiClient(ABC):
+class IHttpClient(ABC):
     @abstractmethod
     def get(self, path: str, params: Optional[dict] = None) -> Any: ...
     @abstractmethod
@@ -26,8 +26,6 @@ class ITransactionRepository(ABC):
     def delete_transaction(self, id: str) -> dict: ...
     @abstractmethod
     def bulk_delete_transactions(self, ids: list[str]) -> dict: ...
-    @abstractmethod
-    def cache_transactions(self, transactions: list, month: str): ...
 
 
 class IBudgetRepository(ABC):
@@ -43,8 +41,6 @@ class IBudgetRepository(ABC):
     def delete_budget(self, id: str) -> dict: ...
     @abstractmethod
     def bulk_delete_budgets(self, ids: list[str]) -> dict: ...
-    @abstractmethod
-    def cache_budgets(self, budgets: list, month: str): ...
 
 
 class IGoalRepository(ABC):
@@ -58,8 +54,6 @@ class IGoalRepository(ABC):
     def delete_goal(self, id: str) -> dict: ...
     @abstractmethod
     def bulk_delete_goals(self, ids: list[str]) -> dict: ...
-    @abstractmethod
-    def cache_goals(self, goals: list): ...
 
 
 class IStatsRepository(ABC):
@@ -80,22 +74,28 @@ class IExchangeRateRepository(ABC):
     def get_exchange_rates(self) -> dict: ...
 
 
-class ICacheRepository(ABC):
+class IRatesCache(ABC):
     @abstractmethod
     def get_rate(self, base: str, target: str) -> float | None: ...
     @abstractmethod
     def cache_rates(self, base: str, rates: dict): ...
 
+
+class ITransactionCache(ABC):
     @abstractmethod
     def get_cached_transactions(self, month: str = "") -> list: ...
     @abstractmethod
     def cache_transactions(self, transactions: list, month: str): ...
 
+
+class IBudgetCache(ABC):
     @abstractmethod
     def get_cached_budgets(self, month: str = "") -> list: ...
     @abstractmethod
     def cache_budgets(self, budgets: list, month: str): ...
 
+
+class IGoalCache(ABC):
     @abstractmethod
     def get_cached_goals(self) -> list: ...
     @abstractmethod

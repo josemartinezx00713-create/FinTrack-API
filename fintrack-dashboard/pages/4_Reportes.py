@@ -3,31 +3,24 @@ import pandas as pd
 import io
 import xlsxwriter
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, get_currency, get_rate, get_api_client, get_local_repo
-from models.exceptions import ApiCaidaError, DatosNoEncontradosError
+from di_container import apply_global_css, get_container
 
 st.set_page_config(page_title="Reportes", layout="wide")
 apply_global_css()
 
-api = get_api_client()
-local_repo = get_local_repo()
+container = get_container()
+fetcher = container.data_fetcher
+currency = container.currency_service
 
 st.title("Reportes Detallados")
 
 st.subheader("Comparativa Mensual (Últimos 6 meses)")
-def fetch_trends():
-    try:
-        return api.get_trends(6)
-    except ApiCaidaError:
-        try:
-            return local_repo.get_trends(6)
-        except DatosNoEncontradosError:
-            return []
+
 try:
-    trends = fetch_trends()
+    trends = fetcher.get_trends(6)
     if trends:
         df_trends = pd.DataFrame(trends)
-        rate = get_rate()
+        rate = currency.get_rate()
         df_trends["income"] = df_trends["income"] * rate
         df_trends["expense"] = df_trends["expense"] * rate
         df_trends["balance"] = df_trends["balance"] * rate
@@ -36,7 +29,7 @@ try:
         df_trends = df_trends.set_index("Mes").T
 
         st.markdown('<div class="report-card">', unsafe_allow_html=True)
-        curr = get_currency()
+        curr = currency.get_currency_symbol()
         st.dataframe(df_trends.style.format(f"{curr}{{:.2f}}"), width="stretch")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
@@ -55,16 +48,11 @@ with col1:
 with col2:
     st.markdown("<br>", unsafe_allow_html=True)
     try:
-        try:
-            data = api.get_transactions(month_input)
-            cats = api.get_category_stats(month_input)
-            summary = api.get_summary(month_input)
-        except ApiCaidaError:
-            data = local_repo.get_transactions(month_input)
-            cats = local_repo.get_category_stats(month_input)
-            summary = local_repo.get_summary(month_input)
+        data = fetcher.get_transactions(month_input)
+        cats = fetcher.get_category_stats(month_input)
+        summary = fetcher.get_summary(month_input)
+        
         if data:
-
             df_exp = pd.DataFrame(data)
             df_exp_esp = df_exp.copy()
             df_exp_esp["type"] = df_exp_esp["type"].apply(lambda x: "Ingreso" if x == "income" else "Gasto")
@@ -149,7 +137,7 @@ with col2:
                         current_row = cat_start
                         for cat, amount in cats.items():
                             worksheet2.write(current_row, 0, cat, cell_format_2)
-                            worksheet2.write_number(current_row, 1, amount * get_rate(), money_format_2)
+                            worksheet2.write_number(current_row, 1, amount * currency.get_rate(), money_format_2)
                             current_row += 1
                         cat_end = current_row - 1
 
@@ -174,5 +162,5 @@ with col2:
             )
         else:
             st.write("No se encontraron transacciones para este mes.")
-    except (ApiCaidaError, DatosNoEncontradosError) as e:
+    except Exception as e:
         st.error(f"No hay datos disponibles: {e}")

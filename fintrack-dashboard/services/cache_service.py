@@ -1,14 +1,14 @@
 import sqlite3
 import json
 from datetime import datetime
-from services.ports import ICacheRepository
+from services.ports import ITransactionCache, IBudgetCache, IGoalCache, IRatesCache
 from models.exceptions import ErrorPersistencia
 
 CACHE_DB = "cache_fintrack.db"
 BASE_CURRENCY = "NIO"
 
 
-class CacheService(ICacheRepository):
+class CacheService(ITransactionCache, IBudgetCache, IGoalCache, IRatesCache):
     def __init__(self, db_path: str = CACHE_DB):
         self.db_path = db_path
         self._init_cache()

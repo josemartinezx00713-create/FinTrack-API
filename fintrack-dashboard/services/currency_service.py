@@ -1,6 +1,6 @@
 import json
 import os
-from services.ports import IExchangeRateRepository, ICacheRepository
+from services.ports import IExchangeRateRepository, IRatesCache
 
 PREFS_FILE = "user_preferences.json"
 BASE_CURRENCY = "NIO"
@@ -13,7 +13,7 @@ CURRENCIES = [
 
 
 class CurrencyService:
-    def __init__(self, exchange_repo: IExchangeRateRepository, cache: ICacheRepository):
+    def __init__(self, exchange_repo: IExchangeRateRepository, cache: IRatesCache):
         self.exchange_repo = exchange_repo
         self.cache = cache
 

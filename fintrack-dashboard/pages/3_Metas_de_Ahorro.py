@@ -1,14 +1,14 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from ui_tweak import apply_global_css, fmt_money, fmt_html_money, get_api_client, get_local_repo
-from models.exceptions import ApiCaidaError, DatosNoEncontradosError
+from di_container import apply_global_css, get_container
 
 st.set_page_config(page_title="Metas de Ahorro", layout="wide")
 apply_global_css()
 
-api = get_api_client()
-local_repo = get_local_repo()
+container = get_container()
+fetcher = container.data_fetcher
+currency = container.currency_service
 
 st.title("Metas de Ahorro")
 
@@ -19,24 +19,17 @@ with st.sidebar.expander("Añadir Nueva Meta"):
         g_deadline = st.date_input("Fecha Límite")
         if st.form_submit_button("Crear Meta"):
             try:
-                api.create_goal({"name": g_name, "target": g_target, "deadline": g_deadline.strftime("%Y-%m-%d")})
+                fetcher.create_goal({"name": g_name, "target": g_target, "deadline": g_deadline.strftime("%Y-%m-%d")})
                 st.success("Meta añadida.")
                 st.cache_data.clear()
                 st.rerun()
-            except ApiCaidaError as e:
-                st.error(f"Error de conexión: {e.message}")
+            except Exception as e:
+                st.error("Error al crear meta.")
 
-try:
-    goals = api.get_goals()
-    if goals:
-        local_repo.cache_goals(goals)
-except ApiCaidaError:
-    try:
-        goals = local_repo.get_goals()
-        st.warning("Usando datos locales (API no disponible)")
-    except DatosNoEncontradosError:
-        goals = []
-        st.info("No hay metas en caché local.")
+goals = fetcher.get_goals()
+
+if not goals:
+    st.info("No hay metas en caché local o el API no devolvió datos.")
 
 if goals:
     cols = st.columns(3)
@@ -54,8 +47,8 @@ if goals:
 <div class="goal-card" {completed_style}>
     <div class="goal-title">{g["name"]}</div>
     <div class="goal-amounts">
-        <span>Ahorrado: <span class="goal-amount-val">{fmt_html_money(current)}</span></span>
-        <span>Meta: {fmt_html_money(target)}</span>
+        <span>Ahorrado: <span class="goal-amount-val">{currency.fmt_html_money(current)}</span></span>
+        <span>Meta: {currency.fmt_html_money(target)}</span>
     </div>
     <div class="progress-track">
         <div class="progress-fill" style="width: {pct}%;"></div>
@@ -76,8 +69,8 @@ if goals:
     df = pd.DataFrame(goals)
     df_view = df.copy()
     df_view.insert(0, "Seleccionar", False)
-    df_view["Meta"] = df_view["target"].apply(fmt_money)
-    df_view["Ahorrado"] = df_view["current"].apply(fmt_money)
+    df_view["Meta"] = df_view["target"].apply(currency.fmt_money)
+    df_view["Ahorrado"] = df_view["current"].apply(currency.fmt_money)
     df_view["Progreso"] = df_view.apply(lambda row: f"{(row['current'] / row['target'] * 100 if row['target'] > 0 else 0):.1f}%", axis=1)
 
     df_view = df_view[["Seleccionar", "id", "name", "Ahorrado", "Meta", "Progreso", "deadline"]]
@@ -108,21 +101,21 @@ if goals:
                 with cA:
                     if st.form_submit_button("Depositar", type="primary"):
                         try:
-                            api.deposit_to_goal(row["ID_Oculto"], deposit)
+                            fetcher.deposit_to_goal(row["ID_Oculto"], deposit)
                             st.success("Depósito exitoso")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error al depositar.")
                 with cB:
                     if st.form_submit_button("Eliminar Meta"):
                         try:
-                            api.delete_goal(row["ID_Oculto"])
+                            fetcher.delete_goal(row["ID_Oculto"])
                             st.success("Meta eliminada exitosamente")
                             st.cache_data.clear()
                             st.rerun()
-                        except ApiCaidaError as e:
-                            st.error(f"Error de conexión: {e.message}")
+                        except Exception as e:
+                            st.error("Error al eliminar meta.")
     elif len(selected_goals) > 1:
         st.markdown("---")
         st.subheader(f"{len(selected_goals)} Metas Seleccionadas")
@@ -132,11 +125,11 @@ if goals:
                 if st.form_submit_button("Eliminar Seleccionadas"):
                     try:
                         ids = [r["ID_Oculto"] for _, r in selected_goals.iterrows()]
-                        api.bulk_delete_goals(ids)
+                        fetcher.bulk_delete_goals(ids)
                         st.success("Metas eliminadas.")
                         st.cache_data.clear()
                         st.rerun()
-                    except ApiCaidaError as e:
-                        st.error(f"Error de conexión: {e.message}")
+                    except Exception as e:
+                        st.error("Error al eliminar metas.")
 else:
     st.info("No tienes metas de ahorro actualmente. ¡Comienza planeando un viaje o ahorrando para algo que te guste!")
